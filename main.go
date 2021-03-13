@@ -62,9 +62,18 @@ func matchFileName(rg string, fname string) bool {
 }
 
 func matchFileSuffix(suffix string, fname string) bool {
+	suffixs := strings.Split(suffix, "|")
+
+
 	ss := strings.Split(fname, ".")
 	s := ss[len(ss)-1]
-	return strings.EqualFold(strings.ToLower(suffix), strings.ToLower(s))
+
+	for _, sf := range suffixs {
+		if strings.EqualFold(strings.ToLower(sf), strings.ToLower(s)) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchFileStartswith(s string, fname string) bool {
@@ -127,10 +136,10 @@ func end(result []FileInfoExt, fullpath bool, pdir string) {
 			// fmt.Printf("%s\n", absPath)
 			fmt.Printf("%s\n", f.RelativePath)
 		} else {
-			fmt.Printf("[+] %v - %s - %s\n", readFileInfoTime(f.FInfo), core.Bytes(uint64(f.FInfo.Size())), f.RelativePath)
+			fmt.Printf("[+] %v - %s - %s\n", readFileInfoTime(f.FInfo), core.Bytes(uint64(f.FInfo.Size())), f.RelativePath)	
 		}
-
 	}
+	fmt.Printf("[*] count: %d\n", len(result))
 }
 
 func realRemove(files []FileInfoExt) {
@@ -218,7 +227,7 @@ func main() {
 			promptString = "yes\r\n"
 		}
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf("[DANGEROUS] delete %d files, please confirm (yes/no):", len(result))
+		fmt.Printf("\n[DANGEROUS] delete %d files, please confirm (yes/no):", len(result))
 		text, _ := reader.ReadString('\n')
 		if text == promptString {
 			realRemove(result)
