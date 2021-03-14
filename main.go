@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"bufio"
+	"unicode"
+	_ "strconv"
 )
 
 type Options struct {
@@ -35,10 +37,6 @@ type FileInfoExt struct {
 }
 
 var platform string = core.CheckOS()
-
-func sizeFilterValidater() (msg string, ret bool) {
-	return "", true
-}
 
 func checkDirExists(d string) (msg string, ret bool) {
 	ds, err := os.Stat(d)
@@ -80,18 +78,38 @@ func matchFileStartswith(s string, fname string) bool {
 	return strings.HasPrefix(fname, s)
 }
 
+func sizeFilter(s string) (string, int64, error) {
+		var e error
+		if !strings.HasPrefix(s, ">") && !strings.HasPrefix(s, "=") && !strings.HasPrefix(s, "<") {
+			return "", 0, e
+		}
+		var t []rune
+		lastDigit := 0
+		for i, n := range s {
+			if unicode.IsDigit(n) {
+				t = append(t, rune(n))
+				lastDigit = i
+			}
+		}
+		extra := strings.TrimSpace(s[lastDigit+1:])
+		sizeString := string(t) + " " + extra
+ 		n, _ := core.ParseBytes(sizeString)
+		// n, err:= strconv.Atoi(string(t))
+		return string(s[0]), int64(n), nil
+}
 
 func parseOptions() *Options {
 	options := &Options{}
 	flag.BoolVar(&options.IsRecur, "recur", false, "是否递归")
 	flag.StringVar(&options.Dir, "d", "", "扫描目录, 如果不提供则扫描当前工作目录")
 	// flag.StringVar(&options.Type, "t", "", "-t=f or -t=d")
-	flag.StringVar(&options.SortBy, "s", "", "-s=time -s=size")
+	flag.StringVar(&options.SortBy, "s", "", "时间time 文件大小size")
 	flag.StringVar(&options.Name, "name", "", "-name=foo")
 	flag.StringVar(&options.FileSuffix, "suffix", "", "-suffix=zip 注意 程序只取split('.')[-1]")
 	flag.BoolVar(&options.PrintFullPath, "fullpath", false, "输出绝对路径")
 	flag.BoolVar(&options.ActionRemoveFile, "rm", false, "[!] 删除文件")
 	flag.StringVar(&options.Startswith, "startswith", "", "startswith string")
+	flag.StringVar(&options.SizeFilter, "size", "", "-size \">10k\"")
 	flag.Parse()
 	if options.Dir == "" {
 		options.Dir, _ = os.Getwd()
@@ -192,6 +210,7 @@ func main() {
 			break
 		}
 	}
+
 	if opts.Startswith != "" {
 		for _, f := range resultAll {
 			if matchFileStartswith(opts.Startswith, f.FInfo.Name()) {
@@ -215,11 +234,30 @@ func main() {
 		result = append(result, resultAll...)
 	}
 
-	if opts.SortBy != "" {
-		fmt.Println(opts.SortBy)
-		sortBy(&result, opts.SortBy)
+	var finalResult []FileInfoExt
+	if opts.SizeFilter != "" {
+		op, bytesSum, err := sizeFilter(opts.SizeFilter)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		for _, f := range result {
+			if op == ">" {
+				if f.FInfo.Size() > bytesSum {finalResult = append(finalResult, f)}
+			} else if op == "=" {
+				if f.FInfo.Size() == bytesSum {finalResult = append(finalResult, f)}
+			} else if op == "<" {
+				if f.FInfo.Size() < bytesSum {finalResult = append(finalResult, f)}
+			}
+
+		}
+	} else {
+		finalResult = result
 	}
-	end(result, opts.PrintFullPath, opts.Dir)
+
+	if opts.SortBy != "" {
+		sortBy(&finalResult, opts.SortBy)
+	}
+	end(finalResult, opts.PrintFullPath, opts.Dir)
 	
 	if opts.ActionRemoveFile {
 		promptString := "yes\n"
@@ -227,10 +265,10 @@ func main() {
 			promptString = "yes\r\n"
 		}
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf("\n[DANGEROUS] delete %d files, please confirm (yes/no):", len(result))
+		fmt.Printf("\n[DANGEROUS] delete %d files, please confirm (yes/no):", len(finalResult))
 		text, _ := reader.ReadString('\n')
 		if text == promptString {
-			realRemove(result)
+			realRemove(finalResult)
 		} else {
 			fmt.Println("keep files, quit")
 		}
