@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"golf/core"
@@ -9,10 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
-	"bufio"
-	"unicode"
 	_ "strconv"
+	"strings"
+	"unicode"
 )
 
 type Options struct {
@@ -62,7 +62,6 @@ func matchFileName(rg string, fname string) bool {
 func matchFileSuffix(suffix string, fname string) bool {
 	suffixs := strings.Split(suffix, "|")
 
-
 	ss := strings.Split(fname, ".")
 	s := ss[len(ss)-1]
 
@@ -79,23 +78,23 @@ func matchFileStartswith(s string, fname string) bool {
 }
 
 func sizeFilter(s string) (string, int64, error) {
-		var e error
-		if !strings.HasPrefix(s, ">") && !strings.HasPrefix(s, "=") && !strings.HasPrefix(s, "<") {
-			return "", 0, e
+	var e error
+	if !strings.HasPrefix(s, ">") && !strings.HasPrefix(s, "=") && !strings.HasPrefix(s, "<") {
+		return "", 0, e
+	}
+	var t []rune
+	lastDigit := 0
+	for i, n := range s {
+		if unicode.IsDigit(n) {
+			t = append(t, rune(n))
+			lastDigit = i
 		}
-		var t []rune
-		lastDigit := 0
-		for i, n := range s {
-			if unicode.IsDigit(n) {
-				t = append(t, rune(n))
-				lastDigit = i
-			}
-		}
-		extra := strings.TrimSpace(s[lastDigit+1:])
-		sizeString := string(t) + " " + extra
- 		n, _ := core.ParseBytes(sizeString)
-		// n, err:= strconv.Atoi(string(t))
-		return string(s[0]), int64(n), nil
+	}
+	extra := strings.TrimSpace(s[lastDigit+1:])
+	sizeString := string(t) + " " + extra
+	n, _ := core.ParseBytes(sizeString)
+	// n, err:= strconv.Atoi(string(t))
+	return string(s[0]), int64(n), nil
 }
 
 func parseOptions() *Options {
@@ -134,13 +133,9 @@ func sizeHumanRead(b int64) string {
 	return ""
 }
 
-func walkDir(dir string) []os.FileInfo {
+func walkDir(dir string) ([]os.FileInfo, error) {
 	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		fmt.Println(err.Error(), dir)
-		os.Exit(1)
-	}
-	return files
+	return files, err
 }
 
 func readFileInfoTime(finfo os.FileInfo) string {
@@ -154,7 +149,7 @@ func end(result []FileInfoExt, fullpath bool, pdir string) {
 			// fmt.Printf("%s\n", absPath)
 			fmt.Printf("%s\n", f.RelativePath)
 		} else {
-			fmt.Printf("[+] %v - %s - %s\n", readFileInfoTime(f.FInfo), core.Bytes(uint64(f.FInfo.Size())), f.RelativePath)	
+			fmt.Printf("[+] %v - %s - %s\n", readFileInfoTime(f.FInfo), core.Bytes(uint64(f.FInfo.Size())), f.RelativePath)
 		}
 	}
 	fmt.Printf("[*] count: %d\n", len(result))
@@ -192,10 +187,19 @@ func main() {
 			} else if len(waitDirs) == 1 {
 				waitDirs = waitDirs[:0]
 			}
-			fs := walkDir(thisDir)
+			fs, err := walkDir(thisDir)
+			if err != nil {
+				// fmt.Println(err.Error(), thisDir)
+				continue
+			}
 			for _, f := range fs {
+
 				tpath := filepath.Join(thisDir, f.Name())
-				t, _ := os.Stat(tpath)
+				t, err := os.Stat(tpath)
+				if err != nil {
+					// fmt.Printf("%v -> %+v\n", f, err.Error())
+					continue
+				}
 				if t.IsDir() {
 					waitDirs = append(waitDirs, tpath)
 				} else {
@@ -242,11 +246,17 @@ func main() {
 		}
 		for _, f := range result {
 			if op == ">" {
-				if f.FInfo.Size() > bytesSum {finalResult = append(finalResult, f)}
+				if f.FInfo.Size() > bytesSum {
+					finalResult = append(finalResult, f)
+				}
 			} else if op == "=" {
-				if f.FInfo.Size() == bytesSum {finalResult = append(finalResult, f)}
+				if f.FInfo.Size() == bytesSum {
+					finalResult = append(finalResult, f)
+				}
 			} else if op == "<" {
-				if f.FInfo.Size() < bytesSum {finalResult = append(finalResult, f)}
+				if f.FInfo.Size() < bytesSum {
+					finalResult = append(finalResult, f)
+				}
 			}
 
 		}
@@ -258,7 +268,7 @@ func main() {
 		sortBy(&finalResult, opts.SortBy)
 	}
 	end(finalResult, opts.PrintFullPath, opts.Dir)
-	
+
 	if opts.ActionRemoveFile {
 		promptString := "yes\n"
 		if platform == "windows" {
