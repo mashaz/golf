@@ -105,7 +105,7 @@ func parseOptions() *Options {
 	flag.StringVar(&options.SortBy, "s", "", "时间time 文件大小size")
 	flag.StringVar(&options.Name, "name", "", "-name=foo")
 	flag.StringVar(&options.FileSuffix, "suffix", "", "-suffix=zip 注意 程序只取split('.')[-1]")
-	flag.BoolVar(&options.PrintFullPath, "fullpath", false, "输出绝对路径")
+	flag.BoolVar(&options.PrintFullPath, "bytes", false, "size with bytes")
 	flag.BoolVar(&options.ActionRemoveFile, "rm", false, "[!] 删除文件")
 	flag.StringVar(&options.Startswith, "startswith", "", "startswith string")
 	flag.StringVar(&options.SizeFilter, "size", "", "-size \">10k\"")
@@ -147,7 +147,7 @@ func end(result []FileInfoExt, fullpath bool, pdir string) {
 		if fullpath {
 			// absPath, _ := filepath.Abs(f.FInfo.Name())
 			// fmt.Printf("%s\n", absPath)
-			fmt.Printf("%s\n", f.RelativePath)
+			fmt.Printf("[+] %v - %v - %s\n", readFileInfoTime(f.FInfo), f.FInfo.Size(), f.RelativePath)
 		} else {
 			fmt.Printf("[+] %v - %s - %s\n", readFileInfoTime(f.FInfo), core.Bytes(uint64(f.FInfo.Size())), f.RelativePath)
 		}
