@@ -10,14 +10,9 @@ BINARY_EXE=$(BINARY_NAME).exe
 
 all: clean test build
 build:
-		$(GOBUILD) -o $(BINARY_NAME) -v
+		$(GOBUILD) -o bin/$(BINARY_NAME) -v
 test:
 		$(GOTEST) -v 
 clean:
 		$(GOCLEAN)
-		rm -f $(BINARY_NAME)
-		rm -f $(BINARY_UNIX)
-		rm -f $(BINARY_EXE)
-run:
-		$(GOBUILD) -o $(BINARY_NAME) -v -h
-		./$(BINARY_NAME)
+		rm -rf bin/*
